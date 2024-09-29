@@ -88,7 +88,37 @@ int main(int argc, char** argv)
     random_fill(a, size);
     PRINT("Sorted: %s", is_sorted(a, size));
 
-    // TODO
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    pid_t p1 = fork();
+    if (p1 == -1)
+        err(EXIT_FAILURE, "erreur de fork");
+
+    if (p1 == 0)
+    {
+        sort1(a, size);
+        PRINT("Sorted 1: %s", is_sorted(a, size));
+        return EXIT_SUCCESS;
+    }
+
+    wait(NULL);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    PRINT("time 1: %.6f s", diff_timespec(&t1, &t0));
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    pid_t p2 = fork();
+    if (p2 == -1)
+    {
+        err(EXIT_FAILURE, "erreur de fork");
+    }
+    if (p2 == 0)
+    {
+        sort2(a, size);
+        PRINT("Sorted 2: %s", is_sorted(a, size));
+        return EXIT_SUCCESS;
+    }
+    wait(NULL);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    PRINT("time 2: %.6f s", diff_timespec(&t1, &t0));
 
     return EXIT_SUCCESS;
 }
