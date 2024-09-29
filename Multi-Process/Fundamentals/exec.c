@@ -11,4 +11,3 @@ int main(int argc, char** argv)
     err(EXIT_FAILURE, "erreur de execvp");
     return EXIT_SUCCESS;
 }
-
