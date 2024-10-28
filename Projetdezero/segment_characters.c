@@ -6,6 +6,7 @@
 #define MAX_CHAR_HEIGHT 50
 #define MIN_CHAR_WIDTH 5
 #define MIN_CHAR_HEIGHT 5
+#define NOISE_TOLERANCE 5  // Nombre de pixels noirs tolérés dans une "ligne vide"
 
 int processed_pixels[1000][1000];
 
@@ -58,24 +59,25 @@ void save_character(SDL_Surface *surface, int left, int top, int right, int bott
     SDL_FreeSurface(charSurface);
 }
 
-// Vérifie si une ligne est vide
 int is_empty_line(SDL_Surface *surface, int y) {
+    int black_pixels = 0;
     for (int x = 0; x < surface->w; x++) {
-        if (is_black_pixel(surface, x, y)) return 0;
+        if (is_black_pixel(surface, x, y)) {
+            black_pixels++;
+            if (black_pixels > NOISE_TOLERANCE) {
+                return 0;  // Pas une ligne vide si trop de pixels noirs
+            }
+        }
     }
-    return 1;
+    return 1;  // Ligne considérée comme vide
 }
 
 void segment_characters(SDL_Surface *surface) {
     int index = 0;
     memset(processed_pixels, 0, sizeof(processed_pixels));
 
-    int y = 0;
-    while (y < surface->h) {
-        if (is_empty_line(surface, y)) {
-            y++;  // Passe à la ligne suivante si elle est vide
-            continue;
-        }
+    for (int y = 0; y < surface->h; y++) {
+        if (is_empty_line(surface, y)) continue;
 
         for (int x = 0; x < surface->w; x++) {
             if (is_black_pixel(surface, x, y)) {
@@ -89,7 +91,7 @@ void segment_characters(SDL_Surface *surface) {
             }
         }
 
-        // Passe à la prochaine ligne vide après avoir traité une ligne pleine
+        // Passe aux prochaines lignes vides après une ligne pleine pour éviter le chevauchement
         while (y < surface->h && !is_empty_line(surface, y)) {
             y++;
         }
