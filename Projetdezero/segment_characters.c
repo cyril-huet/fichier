@@ -7,30 +7,29 @@
 #define MIN_CHAR_WIDTH 5
 #define MIN_CHAR_HEIGHT 5
 
-int processed_pixels[1000][1000];
+int processed_pixels[1000][1000];  // Marque les pixels déjà traités
 
 int is_black_pixel(SDL_Surface *surface, int x, int y) {
-    if (processed_pixels[y][x]) return 0;
+    if (x < 0 || x >= surface->w || y < 0 || y >= surface->h) return 0;  // Hors limites
+    if (processed_pixels[y][x]) return 0;  // Pixel déjà traité
 
     Uint32 pixel = ((Uint32*)surface->pixels)[y * surface->w + x];
     Uint8 r, g, b;
     SDL_GetRGB(pixel, surface->format, &r, &g, &b);
 
-    return (r == 0 && g == 0 && b == 0);
+    return (r == 0 && g == 0 && b == 0);  // Vérifie si le pixel est noir
 }
 
-void find_character_bounds(SDL_Surface *surface, int startX, int startY, int *left, int *right, int *top, int *bottom) {
-    *left = *right = startX;
-    *top = *bottom = startY;
-
+void mark_processed_pixels(SDL_Surface *surface, int startX, int startY, int *left, int *right, int *top, int *bottom) {
     for (int y = startY; y < surface->h && y <= *bottom + MAX_CHAR_HEIGHT; y++) {
         for (int x = startX; x < surface->w && x <= *right + MAX_CHAR_WIDTH; x++) {
             if (is_black_pixel(surface, x, y)) {
+                processed_pixels[y][x] = 1;  // Marque le pixel comme traité
+
                 if (x < *left) *left = x;
                 if (x > *right) *right = x;
                 if (y < *top) *top = y;
                 if (y > *bottom) *bottom = y;
-                processed_pixels[y][x] = 1;
             }
         }
     }
@@ -58,46 +57,25 @@ void save_character(SDL_Surface *surface, int left, int top, int right, int bott
     SDL_FreeSurface(charSurface);
 }
 
-int is_empty_line(SDL_Surface *surface, int y) {
-    for (int x = 0; x < surface->w; x++) {
-        if (is_black_pixel(surface, x, y)) return 0;
-    }
-    return 1;
-}
-
 void segment_characters(SDL_Surface *surface) {
     int index = 0;
+
     memset(processed_pixels, 0, sizeof(processed_pixels));
 
-    int y = 0;
-    while (y < surface->h) {
-        if (is_empty_line(surface, y)) {
-            y++;
-            continue;
-        }
-
-        printf("Traitement de la ligne %d\n", y);  // Diagnostic : Ligne actuelle traitée
-
+    for (int y = 0; y < surface->h; y++) {
         for (int x = 0; x < surface->w; x++) {
             if (is_black_pixel(surface, x, y)) {
-                int left, right, top, bottom;
-                find_character_bounds(surface, x, y, &left, &right, &top, &bottom);
+                int left = x, right = x, top = y, bottom = y;
 
+                // Marque tous les pixels associés à ce caractère
+                mark_processed_pixels(surface, x, y, &left, &right, &top, &bottom);
+
+                // Sauvegarde le caractère trouvé
                 save_character(surface, left, top, right, bottom, index);
                 index++;
-
-                x = right;  // Passe au pixel suivant après le caractère
             }
         }
-
-        // Saut à la prochaine ligne vide pour détecter une nouvelle ligne de caractères
-        while (y < surface->h && !is_empty_line(surface, y)) {
-            y++;
-        }
-        y++;  // Avance d’une ligne pour éviter de rester bloqué entre deux lignes
     }
-
-    printf("Fin de la segmentation. %d caractères enregistrés.\n", index);  // Diagnostic final
 }
 
 int main(int argc, char *argv[]) {
