@@ -1,27 +1,46 @@
 #include <stdio.h>
-#include <wand/magick_wand.h>
+#include <stdlib.h>
+#include <wand/MagickWand.h>
 
-int main() {
-    // Initialize Image Magick
-    MagickWandGenesis();
+void ResizeImage(const char *input_file, const char *output_file, const char *size) {
+    MagickWandGenesis(); // Initialisation de la bibliothèque MagickWand
 
-    // Read the input image
-    MagickWand* wand = NewMagickWand();
-    MagickReadImage(wand, "crossword_puzzle.jpg");
+    MagickWand *wand = NewMagickWand();
+    
+    // Chargement de l'image
+    if (MagickReadImage(wand, input_file) == MagickFalse) {
+        fprintf(stderr, "Erreur lors de la lecture de l'image %s\n", input_file);
+        DestroyMagickWand(wand);
+        MagickWandTerminus();
+        return;
+    }
 
-    // Preprocess the image
-    MagickBlurImage(wand, 0, 1);
-    MagickCannyEdgeImage(wand, 0, 0.5, 1);
+    // Redimensionnement de l'image
+    if (MagickResizeImage(wand, atoi(size), atoi(size), LanczosFilter, 1.0) == MagickFalse) {
+        fprintf(stderr, "Erreur lors du redimensionnement de l'image\n");
+        DestroyMagickWand(wand);
+        MagickWandTerminus();
+        return;
+    }
 
-    // Find and draw the grid lines
-    // Add your grid detection and drawing logic here
+    // Sauvegarde de l'image redimensionnée
+    if (MagickWriteImage(wand, output_file) == MagickFalse) {
+        fprintf(stderr, "Erreur lors de l'écriture de l'image %s\n", output_file);
+    }
 
-    // Save or display the output image
-    MagickWriteImage(wand, "grid_detection_output.jpg");
+    // Libération des ressources
+    DestroyMagickWand(wand);
+    MagickWandTerminus(); // Terminaison de la bibliothèque MagickWand
+}
 
-    // Clean up
-    wand = DestroyMagickWand(wand);
-    MagickWandTerminus();
+int main(int argc, char **argv) {
+    if (argc != 4) {
+        fprintf(stderr, "Utilisation: %s <input_file> <output_file> <size>\n", argv[0]);
+        return 1;
+    }
+
+    ResizeImage(argv[1], argv[2], argv[3]);
 
     return 0;
 }
+
