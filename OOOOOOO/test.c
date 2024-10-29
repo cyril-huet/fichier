@@ -1,76 +1,58 @@
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <sys/stat.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 
-#define THRESHOLD 100 // Ajuster pour la binarisation
-#define MIN_CHARACTER_SIZE 20 // Taille minimale d'un caractère
+#define CHAR_WIDTH 50  // À ajuster selon la largeur d'une cellule de la grille
+#define CHAR_HEIGHT 50  // À ajuster selon la hauteur d'une cellule de la grille
 
-void binarize(SDL_Surface *image) {
-    for (int y = 0; y < image->h; y++) {
-        for (int x = 0; x < image->w; x++) {
-            Uint32 pixel = ((Uint32 *)image->pixels)[y * image->w + x];
-            Uint8 r, g, b;
-            SDL_GetRGB(pixel, image->format, &r, &g, &b);
-            Uint8 gray = (Uint8)(0.3 * r + 0.59 * g + 0.11 * b);
-
-            if (gray < THRESHOLD) {
-                ((Uint32 *)image->pixels)[y * image->w + x] = SDL_MapRGB(image->format, 0, 0, 0);
-            } else {
-                ((Uint32 *)image->pixels)[y * image->w + x] = SDL_MapRGB(image->format, 255, 255, 255);
-            }
-        }
-    }
+int is_black_pixel(SDL_Surface *surface, int x, int y, int seuil) {
+    Uint32 pixel = ((Uint32*)surface->pixels)[y * surface->w + x];
+    Uint8 r, g, b;
+    SDL_GetRGB(pixel, surface->format, &r, &g, &b);
+    return (r < seuil && g < seuil && b < seuil);
 }
 
-void create_directory_if_not_exists(const char *path) {
-    struct stat st = {0};
-    if (stat(path, &st) == -1) {
-        mkdir(path, 0700);
-    }
-}
-
-void save_letter(SDL_Surface *image, int x, int y, int width, int height, int letter_index) {
-    SDL_Rect rect = {x, y, width, height};
-    SDL_Surface *letter_surface = SDL_CreateRGBSurface(0, width, height, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
-    SDL_BlitSurface(image, &rect, letter_surface, NULL);
-
-    char filename[50];
-    snprintf(filename, sizeof(filename), "letters/letter_%d.png", letter_index);
-    if (IMG_SavePNG(letter_surface, filename) != 0) {
-        printf("Erreur lors de l'enregistrement de %s: %s\n", filename, SDL_GetError());
+void save_character(SDL_Surface *surface, int left, int top, int charWidth, int charHeight, int index) {
+    SDL_Surface *charSurface = SDL_CreateRGBSurface(0, charWidth, charHeight, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    if (!charSurface) {
+        fprintf(stderr, "Erreur de création de surface pour caractère: %s\n", SDL_GetError());
+        return;
     }
 
-    SDL_FreeSurface(letter_surface);
+    SDL_Rect srcRect = { left, top, charWidth, charHeight };
+    SDL_Rect destRect = { 0, 0, charWidth, charHeight };
+    SDL_BlitSurface(surface, &srcRect, charSurface, &destRect);
+
+    char filename[100];
+    sprintf(filename, "character_%d.bmp", index);
+    SDL_SaveBMP(charSurface, filename);
+    SDL_FreeSurface(charSurface);
 }
 
-void detect_characters(SDL_Surface *image) {
-    int letter_index = 0;
-
-    for (int y = 0; y < image->h; y += MIN_CHARACTER_SIZE) {
-        for (int x = 0; x < image->w; x += MIN_CHARACTER_SIZE) {
-            int black_pixels = 0;
-
-            // Compter les pixels noirs dans ce bloc
-            for (int j = 0; j < MIN_CHARACTER_SIZE && y + j < image->h; j++) {
-                for (int i = 0; i < MIN_CHARACTER_SIZE && x + i < image->w; i++) {
-                    Uint32 pixel = ((Uint32 *)image->pixels)[(y + j) * image->w + (x + i)];
-                    Uint8 r, g, b;
-                    SDL_GetRGB(pixel, image->format, &r, &g, &b);
-
-                    if (r == 0 && g == 0 && b == 0) { // Si le pixel est noir
-                        black_pixels++;
+void segment_characters_grid(SDL_Surface *surface) {
+    int index = 0;
+    int seuil = 50;  // Tolérance pour détecter les pixels "noirs"
+    for (int row = 0; row < surface->h / CHAR_HEIGHT; row++) {
+        for (int col = 0; col < surface->w / CHAR_WIDTH; col++) {
+            int left = col * CHAR_WIDTH;
+            int top = row * CHAR_HEIGHT;
+            
+            // Vérifie s'il y a un caractère dans cette cellule
+            int has_char = 0;
+            for (int y = top; y < top + CHAR_HEIGHT && y < surface->h; y++) {
+                for (int x = left; x < left + CHAR_WIDTH && x < surface->w; x++) {
+                    if (is_black_pixel(surface, x, y, seuil)) {
+                        has_char = 1;
+                        break;
                     }
                 }
+                if (has_char) break;
             }
 
-            // Debug : Affiche le nombre de pixels noirs détectés
-            printf("Bloc x=%d, y=%d : %d pixels noirs\n", x, y, black_pixels);
-
-            // Si le bloc contient suffisamment de pixels noirs, on le considère comme une lettre
-            if (black_pixels > (MIN_CHARACTER_SIZE * MIN_CHARACTER_SIZE) / 6) {
-                save_letter(image, x, y, MIN_CHARACTER_SIZE, MIN_CHARACTER_SIZE, letter_index++);
+            // Sauvegarde le caractère s'il est présent
+            if (has_char) {
+                save_character(surface, left, top, CHAR_WIDTH, CHAR_HEIGHT, index);
+                index++;
             }
         }
     }
@@ -82,34 +64,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
-        fprintf(stderr, "Erreur lors de l'initialisation de SDL_image: %s\n", IMG_GetError());
+    SDL_Surface *imageSurface = SDL_LoadBMP("binarized_wordsearch.bmp");
+    if (!imageSurface) {
+        fprintf(stderr, "Erreur lors du chargement de l'image: %s\n", SDL_GetError());
         SDL_Quit();
         return 1;
     }
 
-    SDL_Surface *grid_image = IMG_Load("grid_only.png");
-    if (!grid_image) {
-        fprintf(stderr, "Erreur lors du chargement de l'image: %s\n", IMG_GetError());
-        IMG_Quit();
-        SDL_Quit();
-        return 1;
-    }
+    segment_characters_grid(imageSurface);
 
-    // Créer le dossier letters si nécessaire
-    create_directory_if_not_exists("letters");
-
-    // Étape 1 : Binarisation de l'image
-    binarize(grid_image);
-
-    // Enregistrer l'image binarisée pour débogage
-    IMG_SavePNG(grid_image, "binarized_grid.png");
-
-    // Étape 2 : Détection et sauvegarde des caractères
-    detect_characters(grid_image);
-
-    SDL_FreeSurface(grid_image);
-    IMG_Quit();
+    SDL_FreeSurface(imageSurface);
     SDL_Quit();
 
     return 0;
