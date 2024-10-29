@@ -7,7 +7,7 @@
 #define MIN_CHAR_WIDTH 5
 #define MIN_CHAR_HEIGHT 5
 
-int processed_pixels[10000][10000];
+int processed_pixels[1000][1000];
 
 int is_black_pixel(SDL_Surface *surface, int x, int y) {
     if (processed_pixels[y][x]) return 0;
