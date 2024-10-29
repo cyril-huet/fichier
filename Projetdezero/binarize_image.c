@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 // Seuil de binarisation
-#define BIN_THRESHOLD 128
+#define BIN_THRESHOLD 170
 
 void binarize_image(SDL_Surface *surface) {
     if (surface->format->BytesPerPixel != 4) {

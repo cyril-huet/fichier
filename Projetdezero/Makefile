@@ -1,11 +1,9 @@
 # Nom de l'exécutable pour chaque programme
-CONVERT_EXEC = convert_bmp
 AFFICHER_EXEC = afficher_image
-BINARIZE_EXEC = binarize
+BINARIZE_EXEC = binarize_image
 SEGMENT_EXEC = segment_characters
 
 # Fichiers source pour chaque programme
-CONVERT_SRC = convert_bmp.c
 AFFICHER_SRC = afficher_image.c
 BINARIZE_SRC = binarize_image.c
 SEGMENT_SRC = segment_characters.c
@@ -17,10 +15,6 @@ CFLAGS = -lSDL2
 # Cibles par défaut
 all: $(CONVERT_EXEC) $(AFFICHER_EXEC) $(BINARIZE_EXEC) $(SEGMENT_EXEC)
 
-# Règle pour convertir l'image en BMP
-$(CONVERT_EXEC): $(CONVERT_SRC)
-	$(CC) -o $(CONVERT_EXEC) $(CONVERT_SRC) $(CFLAGS)
-	@echo "Compilation de $(CONVERT_EXEC) terminée."
 
 # Règle pour compiler afficher_image
 $(AFFICHER_EXEC): $(AFFICHER_SRC)
