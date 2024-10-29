@@ -58,7 +58,6 @@ void save_character(SDL_Surface *surface, int left, int top, int right, int bott
     SDL_FreeSurface(charSurface);
 }
 
-// Vérifie si une ligne est vide
 int is_empty_line(SDL_Surface *surface, int y) {
     for (int x = 0; x < surface->w; x++) {
         if (is_black_pixel(surface, x, y)) return 0;
@@ -70,12 +69,8 @@ void segment_characters(SDL_Surface *surface) {
     int index = 0;
     memset(processed_pixels, 0, sizeof(processed_pixels));
 
-    int y = 0;
-    while (y < surface->h) {
-        if (is_empty_line(surface, y)) {
-            y++;  // Passe à la ligne suivante si elle est vide
-            continue;
-        }
+    for (int y = 0; y < surface->h; y++) {
+        if (is_empty_line(surface, y)) continue;
 
         for (int x = 0; x < surface->w; x++) {
             if (is_black_pixel(surface, x, y)) {
@@ -85,11 +80,10 @@ void segment_characters(SDL_Surface *surface) {
                 save_character(surface, left, top, right, bottom, index);
                 index++;
 
-                x = right;  // Passe au pixel suivant après le caractère
+                x = right;  // Move to the right after finding a character to avoid overlap
             }
         }
 
-        // Passe à la prochaine ligne vide après avoir traité une ligne pleine
         while (y < surface->h && !is_empty_line(surface, y)) {
             y++;
         }
@@ -102,7 +96,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    SDL_Surface *imageSurface = SDL_LoadBMP("binarized_wordsearch.bmp");
+    SDL_Surface *imageSurface = SDL_LoadBMP("IMG_0311_converted.bmp");
     if (!imageSurface) {
         fprintf(stderr, "Erreur lors du chargement de l'image: %s\n", SDL_GetError());
         SDL_Quit();
@@ -116,3 +110,4 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
