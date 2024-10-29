@@ -1,10 +1,11 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define THRESHOLD 128 // Seuil pour la binarisation
-#define MIN_CHARACTER_SIZE 20 // Taille minimale d'un caractère (en pixels)
+#define THRESHOLD 100 // Ajuster pour la binarisation
+#define MIN_CHARACTER_SIZE 20 // Taille minimale d'un caractère
 
 void binarize(SDL_Surface *image) {
     for (int y = 0; y < image->h; y++) {
@@ -23,6 +24,13 @@ void binarize(SDL_Surface *image) {
     }
 }
 
+void create_directory_if_not_exists(const char *path) {
+    struct stat st = {0};
+    if (stat(path, &st) == -1) {
+        mkdir(path, 0700);
+    }
+}
+
 void save_letter(SDL_Surface *image, int x, int y, int width, int height, int letter_index) {
     SDL_Rect rect = {x, y, width, height};
     SDL_Surface *letter_surface = SDL_CreateRGBSurface(0, width, height, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
@@ -30,7 +38,9 @@ void save_letter(SDL_Surface *image, int x, int y, int width, int height, int le
 
     char filename[50];
     snprintf(filename, sizeof(filename), "letters/letter_%d.png", letter_index);
-    IMG_SavePNG(letter_surface, filename);
+    if (IMG_SavePNG(letter_surface, filename) != 0) {
+        printf("Erreur lors de l'enregistrement de %s: %s\n", filename, SDL_GetError());
+    }
 
     SDL_FreeSurface(letter_surface);
 }
@@ -55,8 +65,11 @@ void detect_characters(SDL_Surface *image) {
                 }
             }
 
+            // Debug : Affiche le nombre de pixels noirs détectés
+            printf("Bloc x=%d, y=%d : %d pixels noirs\n", x, y, black_pixels);
+
             // Si le bloc contient suffisamment de pixels noirs, on le considère comme une lettre
-            if (black_pixels > (MIN_CHARACTER_SIZE * MIN_CHARACTER_SIZE) / 4) {
+            if (black_pixels > (MIN_CHARACTER_SIZE * MIN_CHARACTER_SIZE) / 6) {
                 save_letter(image, x, y, MIN_CHARACTER_SIZE, MIN_CHARACTER_SIZE, letter_index++);
             }
         }
@@ -83,8 +96,14 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // Créer le dossier letters si nécessaire
+    create_directory_if_not_exists("letters");
+
     // Étape 1 : Binarisation de l'image
     binarize(grid_image);
+
+    // Enregistrer l'image binarisée pour débogage
+    IMG_SavePNG(grid_image, "binarized_grid.png");
 
     // Étape 2 : Détection et sauvegarde des caractères
     detect_characters(grid_image);
