@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
+
 #define THRESHOLD 128  // Seuil pour binarisation
 
 // Structure pour une image en niveaux de gris
@@ -29,6 +31,47 @@ void free_image(Image img) {
     free(img.data);
 }
 
+// Fonction pour charger une image PNG en niveaux de gris avec SDL
+Image load_image(const char *filename) {
+    SDL_Surface *surface = IMG_Load(filename);
+    if (!surface) {
+        fprintf(stderr, "Erreur de chargement de l'image %s : %s\n", filename, IMG_GetError());
+        exit(1);
+    }
+
+    if (surface->format->BytesPerPixel != 1) {
+        fprintf(stderr, "L'image doit être en niveaux de gris.\n");
+        SDL_FreeSurface(surface);
+        exit(1);
+    }
+
+    Image img = create_image(surface->w, surface->h);
+    uint8_t *pixels = (uint8_t *)surface->pixels;
+    for (int i = 0; i < img.width * img.height; i++) {
+        img.data[i] = pixels[i];
+    }
+
+    SDL_FreeSurface(surface);
+    return img;
+}
+
+// Fonction pour sauvegarder une image en niveaux de gris avec SDL
+void save_image(const char *filename, Image img) {
+    SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormatFrom(
+        img.data, img.width, img.height, 8, img.width, SDL_PIXELFORMAT_INDEX8);
+    
+    if (!surface) {
+        fprintf(stderr, "Erreur lors de la création de la surface pour l'image : %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    if (IMG_SavePNG(surface, filename) != 0) {
+        fprintf(stderr, "Erreur de sauvegarde de l'image %s : %s\n", filename, IMG_GetError());
+    }
+
+    SDL_FreeSurface(surface);
+}
+
 // Fonction pour binariser l'image
 void binarize_image(Image *img) {
     for (int i = 0; i < img->width * img->height; i++) {
@@ -44,7 +87,7 @@ void detect_and_extract_letters(Image *src) {
             visited[i][j] = 0;
         }
     }
-    
+
     int label = 0;
 
     // Détection des contours des lettres
@@ -53,7 +96,6 @@ void detect_and_extract_letters(Image *src) {
             if (src->data[y * src->width + x] == 0 && !visited[y][x]) {
                 int min_x = x, min_y = y, max_x = x, max_y = y;
 
-                // DFS pour trouver les contours de la lettre
                 int stack[src->height * src->width][2];
                 int stack_size = 0;
                 stack[stack_size][0] = x;
@@ -92,7 +134,6 @@ void detect_and_extract_letters(Image *src) {
                     }
                 }
 
-                // Extraire la lettre
                 int letter_width = max_x - min_x + 1;
                 int letter_height = max_y - min_y + 1;
                 
@@ -105,9 +146,10 @@ void detect_and_extract_letters(Image *src) {
                     }
 
                     char filename[50];
-                    snprintf(filename, sizeof(filename), "letter_%d.bmp", label);
-                    label++;
+                    snprintf(filename, sizeof(filename), "letter_%d.png", label);
+                    save_image(filename, letter);
                     free_image(letter);
+                    label++;
                 }
             }
         }
@@ -116,50 +158,22 @@ void detect_and_extract_letters(Image *src) {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        fprintf(stderr, "Usage: %s <input_image.bmp>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input_image.png>\n", argv[0]);
         return 1;
     }
 
-    // Initialiser SDL
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        fprintf(stderr, "Erreur SDL_Init: %s\n", SDL_GetError());
+    if (SDL_Init(SDL_INIT_VIDEO) < 0 || IMG_Init(IMG_INIT_PNG) == 0) {
+        fprintf(stderr, "Erreur lors de l'initialisation de SDL ou SDL_image : %s\n", SDL_GetError());
         return 1;
     }
 
-    // Charger l'image BMP
-    SDL_Surface *image = SDL_LoadBMP(argv[1]);
-    if (!image) {
-        fprintf(stderr, "Erreur SDL_LoadBMP: %s\n", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
+    Image src = load_image(argv[1]);
+    binarize_image(&src);
+    detect_and_extract_letters(&src);
+    free_image(src);
 
-    // Exemple de traitement : convertir en niveaux de gris
-    SDL_LockSurface(image);
-    Uint8 *pixels = (Uint8 *)image->pixels;
-    for (int y = 0; y < image->h; y++) {
-        for (int x = 0; x < image->w; x++) {
-            Uint8 *p = pixels + y * image->pitch + x * image->format->BytesPerPixel;
-            Uint8 r, g, b;
-            SDL_GetRGB(*(Uint32 *)p, image->format, &r, &g, &b);
-            Uint8 gray = 0.299 * r + 0.587 * g + 0.114 * b;
-            *(Uint32 *)p = SDL_MapRGB(image->format, gray, gray, gray);
-        }
-    }
-    SDL_UnlockSurface(image);
-
-    // Sauvegarder l'image en tant que BMP
-    if (SDL_SaveBMP(image, "output.bmp") != 0) {
-        fprintf(stderr, "Erreur SDL_SaveBMP: %s\n", SDL_GetError());
-        SDL_FreeSurface(image);
-        SDL_Quit();
-        return 1;
-    }
-
-    // Libérer la surface et quitter SDL
-    SDL_FreeSurface(image);
+    IMG_Quit();
     SDL_Quit();
-
     return 0;
 }
 
