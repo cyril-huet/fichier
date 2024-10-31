@@ -60,8 +60,10 @@ Image load_png_image(const char *filename) {
 }
 
 // Fonction pour sauvegarder une image en BMP (remplacez par PNG si nécessaire)
+// Fonction pour sauvegarder une image en BMP
 void save_image(const char *filename, Image img) {
-    SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, img.width, img.height, 8, SDL_PIXELFORMAT_INDEX8);
+    // Créer une surface SDL de la bonne taille
+    SDL_Surface *surface = SDL_CreateRGBSurface(0, img.width, img.height, 8, 0, 0, 0, 0);
     if (!surface) {
         fprintf(stderr, "Erreur de création de la surface SDL: %s\n", SDL_GetError());
         exit(1);
