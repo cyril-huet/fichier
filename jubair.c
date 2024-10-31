@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <SDL2/SDL.h>
 
 #define THRESHOLD 128  // Seuil pour binarisation
 
@@ -30,30 +29,6 @@ void free_image(Image img) {
     free(img.data);
 }
 
-// Fonction pour sauvegarder une image en niveaux de gris en utilisant SDL
-void save_image(const char *filename, Image img) {
-    SDL_Surface *surface = SDL_CreateRGBSurface(0, img.width, img.height, 8, 0, 0, 0, 0);
-    if (!surface) {
-        fprintf(stderr, "Erreur de création de la surface SDL: %s\n", SDL_GetError());
-        exit(1);
-    }
-
-    // Remplir la surface avec les données de l'image
-    for (int y = 0; y < img.height; y++) {
-        for (int x = 0; x < img.width; x++) {
-            Uint8 gray = img.data[y * img.width + x]; // Obtenir la valeur en niveaux de gris
-            surface->pixels[y * surface->pitch + x] = SDL_MapRGB(surface->format, gray, gray, gray); // Remplir le pixel
-        }
-    }
-
-    // Sauvegarder l'image (en utilisant SDL_image)
-    if (IMG_SavePNG(surface, filename) != 0) {
-        fprintf(stderr, "Erreur lors de la sauvegarde de l'image: %s\n", IMG_GetError());
-    }
-
-    SDL_FreeSurface(surface);
-}
-
 // Fonction pour binariser l'image
 void binarize_image(Image *img) {
     for (int i = 0; i < img->width * img->height; i++) {
@@ -61,8 +36,27 @@ void binarize_image(Image *img) {
     }
 }
 
+// Fonction pour sauvegarder une sous-image dans un tableau de fichiers
+void save_subimage(const char *base_filename, Image *letter, int label) {
+    // Créer le nom de fichier pour la sous-image
+    char filename[50];
+    snprintf(filename, sizeof(filename), "%s_letter_%d.pgm", base_filename, label);
+    
+    // Sauvegarder en format PGM (Portable Gray Map)
+    FILE *fp = fopen(filename, "wb");
+    if (!fp) {
+        fprintf(stderr, "Erreur d'ouverture du fichier %s.\n", filename);
+        exit(1);
+    }
+    
+    fprintf(fp, "P5\n%d %d\n255\n", letter->width, letter->height);
+    fwrite(letter->data, sizeof(uint8_t), letter->width * letter->height, fp);
+    
+    fclose(fp);
+}
+
 // Fonction pour détecter les contours des lettres et extraire les lettres
-void detect_and_extract_letters(Image *src) {
+void detect_and_extract_letters(Image *src, const char *base_filename) {
     int visited[src->height][src->width];
     for (int i = 0; i < src->height; i++) {
         for (int j = 0; j < src->width; j++) {
@@ -130,9 +124,8 @@ void detect_and_extract_letters(Image *src) {
                         }
                     }
 
-                    char filename[50];
-                    snprintf(filename, sizeof(filename), "letter_%d.png", label);
-                    save_image(filename, letter);
+                    // Sauvegarder la lettre
+                    save_subimage(base_filename, &letter, label);
                     free_image(letter);
                     label++;
                 }
@@ -143,17 +136,23 @@ void detect_and_extract_letters(Image *src) {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        fprintf(stderr, "Usage: %s <input_image.png>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input_image.pgm>\n", argv[0]);
         return 1;
     }
 
-    // Charger l'image source
-    Image src = load_png_image(argv[1]); // Vous pouvez adapter cette fonction pour utiliser SDL ou une autre méthode
+    // Charger l'image source depuis un fichier PGM
+    // Vous devez remplacer cette partie par une méthode appropriée pour charger l'image
+    // Par exemple, utiliser `fopen` et `fread` pour lire l'image PGM
+
+    // Pour l'exemple, nous allons initialiser une image vide ici
+    Image src = create_image(100, 100); // Changez la taille selon vos besoins
+    // Remplir l'image src.data avec les données de l'image chargée ici
+
     // Binariser l'image
     binarize_image(&src);
     
     // Détecter les lettres et les extraire
-    detect_and_extract_letters(&src);
+    detect_and_extract_letters(&src, "output");
     
     // Libérer la mémoire de l'image source
     free_image(src);
