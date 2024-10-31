@@ -73,42 +73,40 @@ void detect_and_extract_letters(Image *src, const char *base_filename) {
                 // Début d'une nouvelle lettre
                 int min_x = x, min_y = y, max_x = x, max_y = y;
 
-                // DFS pour trouver les contours de la lettre
-                int stack[src->height * src->width][2];
-                int stack_size = 0;
-                stack[stack_size][0] = x;
-                stack[stack_size][1] = y;
-                stack_size++;
+                // BFS pour trouver les contours de la lettre
+                int queue[src->height * src->width][2];
+                int queue_size = 0;
+                queue[queue_size][0] = x;
+                queue[queue_size][1] = y;
+                queue_size++;
 
-                while (stack_size > 0) {
-                    stack_size--;
-                    int cur_x = stack[stack_size][0];
-                    int cur_y = stack[stack_size][1];
+                while (queue_size > 0) {
+                    int cur_x = queue[0][0];
+                    int cur_y = queue[0][1];
+                    queue_size--;
 
-                    if (cur_x < 0 || cur_x >= src->width || cur_y < 0 || cur_y >= src->height || visited[cur_y][cur_x]) {
-                        continue;
-                    }
-
+                    // Marquer le pixel comme visité
                     visited[cur_y][cur_x] = 1;
 
-                    if (src->data[cur_y * src->width + cur_x] == 0) {
-                        if (cur_x < min_x) min_x = cur_x;
-                        if (cur_y < min_y) min_y = cur_y;
-                        if (cur_x > max_x) max_x = cur_x;
-                        if (cur_y > max_y) max_y = cur_y;
+                    // Mettre à jour les coordonnées de la lettre
+                    if (cur_x < min_x) min_x = cur_x;
+                    if (cur_y < min_y) min_y = cur_y;
+                    if (cur_x > max_x) max_x = cur_x;
+                    if (cur_y > max_y) max_y = cur_y;
 
-                        stack[stack_size][0] = cur_x + 1;
-                        stack[stack_size][1] = cur_y;
-                        stack_size++;
-                        stack[stack_size][0] = cur_x - 1;
-                        stack[stack_size][1] = cur_y;
-                        stack_size++;
-                        stack[stack_size][0] = cur_x;
-                        stack[stack_size][1] = cur_y + 1;
-                        stack_size++;
-                        stack[stack_size][0] = cur_x;
-                        stack[stack_size][1] = cur_y - 1;
-                        stack_size++;
+                    // Ajouter les voisins non visités à la file d'attente
+                    for (int dy = -1; dy <= 1; dy++) {
+                        for (int dx = -1; dx <= 1; dx++) {
+                            if ((dx == 0 && dy == 0) || (dx != 0 && dy != 0)) continue; // Éviter de prendre les diagonales
+                            int new_x = cur_x + dx;
+                            int new_y = cur_y + dy;
+                            if (new_x >= 0 && new_x < src->width && new_y >= 0 && new_y < src->height &&
+                                !visited[new_y][new_x] && src->data[new_y * src->width + new_x] == 0) {
+                                queue[queue_size][0] = new_x;
+                                queue[queue_size][1] = new_y;
+                                queue_size++;
+                            }
+                        }
                     }
                 }
 
