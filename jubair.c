@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-
+#include <SDL2/SDl.h>
 #define THRESHOLD 128  // Seuil pour binarisation
 
 // Structure pour une image en niveaux de gris
@@ -29,43 +29,118 @@ void free_image(Image img) {
     free(img.data);
 }
 
-// Fonction pour lire une image PGM en niveaux de gris
-Image load_pgm_image(const char *filename) {
+// Fonction pour lire une image PNG en niveaux de gris
+Image load_png_image(const char *filename) {
     FILE *fp = fopen(filename, "rb");
     if (!fp) {
         fprintf(stderr, "Erreur d'ouverture du fichier %s.\n", filename);
         exit(1);
     }
 
-    char format[3];
-    int width, height, max_val;
+    png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (!png) {
+        fclose(fp);
+        fprintf(stderr, "Erreur lors de la création de la structure de lecture PNG.\n");
+        exit(1);
+    }
 
-    // Lecture de l'en-tête PGM
-    fscanf(fp, "%2s\n%d %d\n%d\n", format, &width, &height, &max_val);
-    if (format[0] != 'P' || format[1] != '5' || max_val != 255) {
-        fprintf(stderr, "Le fichier PGM doit être en format P5 avec max_val = 255.\n");
+    png_infop info = png_create_info_struct(png);
+    if (!info) {
+        png_destroy_read_struct(&png, NULL, NULL);
+        fclose(fp);
+        fprintf(stderr, "Erreur lors de la création de la structure d'information PNG.\n");
+        exit(1);
+    }
+
+    if (setjmp(png_jmpbuf(png))) {
+        png_destroy_read_struct(&png, &info, NULL);
+        fclose(fp);
+        fprintf(stderr, "Erreur lors de la lecture de l'image PNG.\n");
+        exit(1);
+    }
+
+    png_init_io(png, fp);
+    png_read_info(png, info);
+
+    int width = png_get_image_width(png, info);
+    int height = png_get_image_height(png, info);
+    png_byte bit_depth = png_get_bit_depth(png, info);
+    png_byte color_type = png_get_color_type(png, info);
+
+    if (color_type != PNG_COLOR_TYPE_GRAY || bit_depth != 8) {
+        fprintf(stderr, "L'image PNG doit être en niveaux de gris avec un bit depth de 8.\n");
+        png_destroy_read_struct(&png, &info, NULL);
         fclose(fp);
         exit(1);
     }
 
     Image img = create_image(width, height);
-    fread(img.data, 1, width * height, fp);
+    png_bytep row = (png_bytep)malloc(width);
+    for (int y = 0; y < height; y++) {
+        png_read_row(png, row, NULL);
+        for (int x = 0; x < width; x++) {
+            img.data[y * width + x] = row[x];
+        }
+    }
+    free(row);
 
+    png_destroy_read_struct(&png, &info, NULL);
     fclose(fp);
+
     return img;
 }
 
-// Fonction pour sauvegarder une image au format PGM
-void save_pgm_image(const char *filename, Image img) {
+// Fonction pour sauvegarder une image PNG
+void save_png_image(const char *filename, Image img) {
     FILE *fp = fopen(filename, "wb");
     if (!fp) {
         fprintf(stderr, "Erreur d'ouverture du fichier %s.\n", filename);
         exit(1);
     }
 
-    fprintf(fp, "P5\n%d %d\n255\n", img.width, img.height);
-    fwrite(img.data, 1, img.width * img.height, fp);
+    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (!png) {
+        fclose(fp);
+        fprintf(stderr, "Erreur lors de la création de la structure d'écriture PNG.\n");
+        exit(1);
+    }
 
+    png_infop info = png_create_info_struct(png);
+    if (!info) {
+        png_destroy_write_struct(&png, NULL);
+        fclose(fp);
+        fprintf(stderr, "Erreur lors de la création de la structure d'information PNG.\n");
+        exit(1);
+    }
+
+    if (setjmp(png_jmpbuf(png))) {
+        png_destroy_write_struct(&png, &info);
+        fclose(fp);
+        fprintf(stderr, "Erreur lors de l'écriture de l'image PNG.\n");
+        exit(1);
+    }
+
+    png_init_io(png, fp);
+
+    png_set_IHDR(
+        png, info, img.width, img.height,
+        8, PNG_COLOR_TYPE_GRAY, PNG_INTERLACE_NONE,
+        PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
+    );
+
+    png_write_info(png, info);
+
+    png_bytep row = (png_bytep)malloc(img.width);
+    for (int y = 0; y < img.height; y++) {
+        for (int x = 0; x < img.width; x++) {
+            row[x] = img.data[y * img.width + x];
+        }
+        png_write_row(png, row);
+    }
+    free(row);
+
+    png_write_end(png, NULL);
+    png_destroy_write_struct(&png, &info);
     fclose(fp);
 }
 
@@ -91,8 +166,10 @@ void detect_and_extract_letters(Image *src) {
     for (int y = 0; y < src->height; y++) {
         for (int x = 0; x < src->width; x++) {
             if (src->data[y * src->width + x] == 0 && !visited[y][x]) {
+                // Début d'une nouvelle lettre
                 int min_x = x, min_y = y, max_x = x, max_y = y;
 
+                // DFS pour trouver les contours de la lettre
                 int stack[src->height * src->width][2];
                 int stack_size = 0;
                 stack[stack_size][0] = x;
@@ -131,9 +208,10 @@ void detect_and_extract_letters(Image *src) {
                     }
                 }
 
+                // Extraire et sauvegarder la lettre
                 int letter_width = max_x - min_x + 1;
                 int letter_height = max_y - min_y + 1;
-
+                
                 if (letter_width > 0 && letter_height > 0) {
                     Image letter = create_image(letter_width, letter_height);
                     for (int ly = 0; ly < letter_height; ly++) {
@@ -143,8 +221,8 @@ void detect_and_extract_letters(Image *src) {
                     }
 
                     char filename[50];
-                    snprintf(filename, sizeof(filename), "letter_%d.pgm", label);
-                    save_pgm_image(filename, letter);
+                    snprintf(filename, sizeof(filename), "letter_%d.png", label);
+                    save_png_image(filename, letter);
                     free_image(letter);
                     label++;
                 }
@@ -153,24 +231,54 @@ void detect_and_extract_letters(Image *src) {
     }
 }
 
+
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        fprintf(stderr, "Usage: %s <input_image.pgm>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input_image.bmp>\n", argv[0]);
         return 1;
     }
 
-    // Charger l'image source
-    Image src = load_pgm_image(argv[1]);
-    
-    // Binariser l'image
-    binarize_image(&src);
-    
-    // Détecter les lettres et les extraire
-    detect_and_extract_letters(&src);
-    
-    // Libérer la mémoire de l'image source
-    free_image(src);
-    
+    // Initialiser SDL
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        fprintf(stderr, "Erreur SDL_Init: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    // Charger l'image BMP
+    SDL_Surface *image = SDL_LoadBMP(argv[1]);
+    if (!image) {
+        fprintf(stderr, "Erreur SDL_LoadBMP: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    // Exemple de traitement : convertir en niveaux de gris
+    SDL_LockSurface(image);
+    Uint8 *pixels = (Uint8 *)image->pixels;
+    for (int y = 0; y < image->h; y++) {
+        for (int x = 0; x < image->w; x++) {
+            Uint8 *p = pixels + y * image->pitch + x * image->format->BytesPerPixel;
+
+            Uint8 r, g, b;
+            SDL_GetRGB(*(Uint32 *)p, image->format, &r, &g, &b);
+            Uint8 gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            *(Uint32 *)p = SDL_MapRGB(image->format, gray, gray, gray);
+        }
+    }
+    SDL_UnlockSurface(image);
+
+    // Sauvegarder l'image en tant que BMP
+    if (SDL_SaveBMP(image, "output.bmp") != 0) {
+        fprintf(stderr, "Erreur SDL_SaveBMP: %s\n", SDL_GetError());
+        SDL_FreeSurface(image);
+        SDL_Quit();
+        return 1;
+    }
+
+    // Libérer la surface et quitter SDL
+    SDL_FreeSurface(image);
+    SDL_Quit();
+
     return 0;
 }
-
