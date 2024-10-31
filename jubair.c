@@ -59,6 +59,30 @@ Image load_png_image(const char *filename) {
     return img;
 }
 
+// Fonction pour sauvegarder une image en BMP (remplacez par PNG si nécessaire)
+void save_image(const char *filename, Image img) {
+    SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, img.width, img.height, 8, SDL_PIXELFORMAT_INDEX8);
+    if (!surface) {
+        fprintf(stderr, "Erreur de création de la surface SDL: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    // Remplir la surface avec les données de l'image
+    for (int y = 0; y < img.height; y++) {
+        for (int x = 0; x < img.width; x++) {
+            Uint8 color = img.data[y * img.width + x];
+            ((Uint8 *)surface->pixels)[y * surface->pitch + x] = color;  // Assurer l'accès à l'index
+        }
+    }
+
+    // Enregistrer l'image en tant que fichier BMP
+    if (SDL_SaveBMP(surface, filename) != 0) {
+        fprintf(stderr, "Erreur de sauvegarde de l'image %s: %s\n", filename, SDL_GetError());
+    }
+
+    SDL_FreeSurface(surface);
+}
+
 // Fonction pour binariser l'image
 void binarize_image(Image *img) {
     for (int i = 0; i < img->width * img->height; i++) {
@@ -136,8 +160,8 @@ void detect_and_extract_letters(Image *src) {
                     }
 
                     char filename[50];
-                    snprintf(filename, sizeof(filename), "letter_%d.png", label);
-                    save_png_image(filename, letter);  // Remplacez par une fonction SDL pour sauvegarder
+                    snprintf(filename, sizeof(filename), "letter_%d.bmp", label);  // Changer l'extension à BMP
+                    save_image(filename, letter);
                     free_image(letter);
                     label++;
                 }
@@ -146,42 +170,22 @@ void detect_and_extract_letters(Image *src) {
     }
 }
 
-// Fonction pour sauvegarder une image en utilisant SDL
-void save_image(const char *filename, Image img) {
-    SDL_Surface *surface = SDL_CreateRGBSurface(0, img.width, img.height, 8, 0, 0, 0, 0);
-    if (!surface) {
-        fprintf(stderr, "Erreur de création de la surface: %s\n", SDL_GetError());
-        exit(1);
-    }
-
-    for (int y = 0; y < img.height; y++) {
-        for (int x = 0; x < img.width; x++) {
-            Uint8 gray = img.data[y * img.width + x];
-            Uint32 pixel = SDL_MapRGB(surface->format, gray, gray, gray);
-            *((Uint32 *)surface->pixels + y * surface->w + x) = pixel;
-        }
-    }
-
-    if (IMG_SavePNG(surface, filename) != 0) {
-        fprintf(stderr, "Erreur de sauvegarde de l'image: %s\n", IMG_GetError());
-    }
-
-    SDL_FreeSurface(surface);
-}
-
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <input_image.png>\n", argv[0]);
         return 1;
     }
 
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        fprintf(stderr, "Erreur lors de l'initialisation de SDL: %s\n", SDL_GetError());
+    // Initialiser SDL
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        fprintf(stderr, "Erreur d'initialisation SDL: %s\n", SDL_GetError());
         return 1;
     }
-    
+
+    // Initialiser SDL_image
     if (IMG_Init(IMG_INIT_PNG) == 0) {
-        fprintf(stderr, "Erreur lors de l'initialisation de SDL_image: %s\n", IMG_GetError());
+        fprintf(stderr, "Erreur d'initialisation SDL_image: %s\n", IMG_GetError());
+        SDL_Quit();
         return 1;
     }
 
@@ -196,7 +200,8 @@ int main(int argc, char *argv[]) {
     
     // Libérer la mémoire de l'image source
     free_image(src);
-    
+
+    // Nettoyer SDL_image et SDL
     IMG_Quit();
     SDL_Quit();
     
