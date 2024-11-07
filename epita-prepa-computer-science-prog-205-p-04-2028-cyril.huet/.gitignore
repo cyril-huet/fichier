@@ -1,9 +1,0 @@
-*.a
-*.lib
-*.o
-*.obj
-*.out
-
-.idea/
-*~
-*.DotSettings.user

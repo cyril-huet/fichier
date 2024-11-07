@@ -1,9 +1,0 @@
-CC = gcc
-CFLAGS = -Wall -Werror -g
-
-separtion: option.c
-	$(CC) $(CFLAGS) -o option option.c -lSDL2 -lSDL2_image -lm
-
-.PHONY: clean
-clean:
-	rm -f option
