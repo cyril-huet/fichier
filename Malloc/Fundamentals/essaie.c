@@ -44,53 +44,55 @@ header* get_sentinel()
     //   So, just return it.
 }
 
+
 void init_heap()
 {
-	header* sentinel = get_sentinel();
-	sbrk(HSIZE);
-	sentinel->prev = NULL;
-	sentinel->next = sbrk(0);
-	sentinel->size = 0;
-	sentinel->free = NO;
+    // Obtenir l'adresse du sentinelle
+    header* sentinel = get_sentinel();
 
+    // Étendre le tas pour réserver de la place pour l'en-tête du sentinelle
+    sbrk(HSIZE);
 
-    // - Get the address of the sentinel
-    // - Allocate the memory for the sentinel
-    //   (obviously do not use malloc).
-    // - Initialize the sentinel with the following values:
-    //   - prev = NULL
-    //   - next = current program break
-    //   - size = 0
-    //   - free = No
+    // Initialiser le sentinelle
+    sentinel->prev = NULL;                // Pas de précédent, c'est le début du tas
+    sentinel->next = sbrk(0);              // Le prochain est la fin actuelle du tas
+    sentinel->size = 0;                    // La taille du sentinelle est 0
+    sentinel->free = NO;                   // Le sentinelle est toujours utilisé
 }
+
 
 header* expand_heap(header* last_header, size_t size)
 {
-	header* current = sbrk(0);
-	size_t taille = size + HSIZE;
+    // Calculer la taille totale (taille de l'en-tête + taille des données)
+    size_t total_size = size + HSIZE;
 
-	if(sbrk(taille) == (void*) -1)
-		return NULL;
+    // Obtenir la fin actuelle du tas avec sbrk(0)
+    void* current_break = sbrk(0);
 
-	current->prev = last_header;
-	current->next = sbrk(0);
-	current->size = size;
-	current->free = NO;
+    // Utiliser sbrk pour étendre le tas avec la taille demandée
+    if (sbrk(total_size) == (void*)-1) {
+        // Si sbrk échoue, retourner NULL
+        return NULL;
+    }
 
-	if(last_header != NULL)
-		last_header->next = current;
+    // Création du nouvel en-tête à partir de la nouvelle mémoire allouée
+    header* new_header = (header*)current_break;
 
-	return current;
+    // Initialiser les champs du nouvel en-tête
+    new_header->size = size;  // Mettre la taille demandée
+    new_header->free = NO;    // Marquer comme alloué
+    new_header->prev = last_header; // Lier au dernier en-tête
+    new_header->next = NULL;  // Il sera le dernier en-tête
 
-    // - Get the current program break.
-    // - Expand the heap
-    //   (Allocate the memory for the
-    //    new header and the data section.)
-    //   If an error occurs, return NULL.
-    // - Initialize the next and prev fields of the new header.
-    // - Update the previous header.
-    // - Return the new header.
+    // Mettre à jour le prochain champ du dernier en-tête si nécessaire
+    if (last_header != NULL) {
+        last_header->next = new_header;
+    }
+
+    // Retourner le nouvel en-tête
+    return new_header;
 }
+
 
 header* find_free_chunk(size_t size)
 {
