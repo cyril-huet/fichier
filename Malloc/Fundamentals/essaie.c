@@ -66,24 +66,21 @@ void init_heap()
 
 header* expand_heap(header* last_header, size_t size)
 {
+	header* current = sbrk(0);
+	size_t taille = size + HSIZE;
 
+	if(sbrk(taille) == (void*) -1)
+		return NULL;
 
-    header* new_header = sbrk(HSIZE + size);
-    if (new_header == (void*)-1) {
-        return NULL;  // sbrk failed
-    }
+	current->prev = last_header;
+	current->next = sbrk(0);
+	current->size = size;
+	current->free = NO;
 
-    new_header->prev = last_header;
-    new_header->next = sbrk(0);  // Point to the current program break
-    new_header->size = size;
-    new_header->free = NO;
+	if(last_header != NULL)
+		last_header->next = current;
 
-    if (last_header != NULL) {
-        last_header->next = new_header;
-    }
-
-    return new_header;
-
+	return current;
 
     // - Get the current program break.
     // - Expand the heap
