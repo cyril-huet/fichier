@@ -119,28 +119,42 @@ header* find_free_chunk(size_t size)
     //   return the address of the last header.
 }
 
-void* my_malloc(size_t size)
-{
-	if(size == 0)
-		return NULL;
 
-	size_t taille = size;
 
-	while(size % 8 != 0)
-		size += 1;
+void* my_malloc(size_t size) {
+    // If "size" is 0, return NULL.
+    if (size == 0)
+        return NULL;
 
-	header* chunk = find_free_chunk(size);
+    // Preserve the original requested size for the header.
+    size_t original_size = size;
 
-	if(chunk == sbrk(0))
-		chunk = expand_heap(chunk->prev, size);
+    // "size" must be a multiple of eight. If it is not,
+    // calculate the next multiple of eight.
+    if (size % 8 != 0)
+        size += 8 - (size % 8);
 
-	if(chunk == NULL)
-		return NULL;
+    // Find the first free chunk large enough, or return the last chunk.
+    header* chunk = find_free_chunk(size);
 
-	chunk->size = taille;
-	chunk->free = NO;
+    // If no suitable chunk is found, expand the heap.
+    if (chunk == sbrk(0))
+        chunk = expand_heap(chunk ? chunk->prev : NULL, size);
 
-	return get_data(chunk);
+    // If heap expansion failed, return NULL.
+    if (chunk == NULL)
+        return NULL;
+
+    // Initialize the chunk's size with the original requested size.
+    chunk->size = original_size;
+
+    // Mark the chunk as allocated.
+    chunk->free = NO;
+
+    // Return the address of the data section within the chunk.
+    return get_data(chunk);
+}
+
 
 
     // - If "size" is 0, return NULL.
@@ -155,7 +169,7 @@ void* my_malloc(size_t size)
     //   must be initialized with the "size" parameter
     //   (not with the next multiple of eight).
     // - Return the address of the data section.
-}
+
 
 void* my_calloc(size_t nmemb, size_t size)
 {
