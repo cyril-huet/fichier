@@ -10,19 +10,22 @@ const size_t NO = 0;
 void* get_data(header* h)
 {
     // TODO
-    return (void*)((char*)h + HSIZE);
+    void* rtn = (void*)((long)h+HSIZE);
+	return rtn;
 }
 
 header* get_header_from_data(void* data)
 {
     // TODO
-    return (header*)((char*)data - HSIZE);
+    header* rtn = (header*)((long)data - (long)HSIZE);
+	return rtn;
 }
 
 size_t get_total(header* h)
 {
     // TODO
-    return HSIZE + h->size;
+   return (long)h->next - (long)h - HSIZE;
+
 }
 
 header* get_sentinel()
