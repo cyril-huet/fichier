@@ -83,7 +83,7 @@ header* expand_heap(header* last_header, size_t size)
     }
 
     return new_header;
-}
+
 
     // - Get the current program break.
     // - Expand the heap
