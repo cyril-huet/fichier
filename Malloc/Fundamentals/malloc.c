@@ -9,59 +9,63 @@ const size_t NO = 0;
 
 void* get_data(header* h)
 {
-    return (void*)((char*)h + HSIZE);
+	void* rtn = (void*)((long)h+HSIZE);
+	return rtn;
 }
 
 
 header* get_header_from_data(void* data)
 {
-    return (header*)((char*)data - HSIZE);
+	header* rtn = (header*)((long)data - (long)HSIZE);
+	return rtn;
 }
+
 
 
 size_t get_total(header* h)
 {
-    return h->size + HSIZE;
+	return (long)h->next - (long)h - HSIZE;
 }
+
 
 
 header* get_sentinel()
 {
-    static header* sentinel = NULL;
-    if (!sentinel)
-    {
-        // Initialize the sentinel when it's the first call.
-        sentinel = sbrk(0); // Current program break
-    }
-    return sentinel;
+    static header* rtn = NULL;
+
+    if (rtn == NULL)
+	    rtn = sbrk(0);
+
+    return rtn;
 }
 
 void init_heap()
 {
-    header* sentinel = get_sentinel();
-    // The current break represents the start of the heap.
-    sentinel->prev = NULL;
-    sentinel->next = NULL;
-    sentinel->size = 0;
-    sentinel->free = NO; // The sentinel is not free.
+	header* sentinel = get_sentinel();
+	sbrk(HSIZE);
+	sentinel->prev = NULL;
+	sentinel->next = sbrk(0);
+	sentinel->size = 0;
+	sentinel->free = NO;
 }
 
 header* expand_heap(header* last_header, size_t size)
 {
-    size_t total_size = size + HSIZE;
-    header* new_header = (header*)sbrk(total_size); // Expands the heap
-    if (new_header == (void*)-1)
-        return NULL; // Allocation failed
+	header* current = sbrk(0);
+	size_t taille = size + HSIZE;
 
-    new_header->prev = last_header;
-    new_header->next = NULL;
-    new_header->size = size;
-    new_header->free = NO;
+	if(sbrk(taille) == (void*) -1)
+		return NULL;
 
-    if (last_header)
-        last_header->next = new_header;
+	current->prev = last_header;
+	current->next = sbrk(0);
+	current->size = size;
+	current->free = NO;
 
-    return new_header;
+	if(last_header != NULL)
+		last_header->next = current;
+
+	return current;
 }
 
 
