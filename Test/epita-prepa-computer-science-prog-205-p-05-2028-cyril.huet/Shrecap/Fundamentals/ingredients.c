@@ -102,24 +102,35 @@ int main(int argc, char *argv[]) {
 
 
     for (int i = 2; i < argc; i++) 
+{
+    if (valide(argv[i])) 
     {
-        if (valide(argv[i])) 
+        if (qind < atoi(argv[1])) 
         {
-            if (qind < atoi(argv[1])) 
-            {
-                res[qind] = atoi(argv[i]);
-                qind++;
-            }
-        } 
-        else 
+            res[qind] = atoi(argv[i]);
+            qind++;
+        }
+    } 
+    else 
+    {
+        if (ingin < N) 
         {
-            if (ingin < N) 
+            // Allocation de mémoire et copie manuelle de la chaîne
+            nbingredient[ingin] = malloc(strlen(argv[i]) + 1); // +1 pour le caractère nul '\0'
+            if (nbingredient[ingin] != NULL) // Vérification de l'allocation
             {
-                nbingredient[ingin] = strdup(argv[i]);  
+                strcpy(nbingredient[ingin], argv[i]);
                 ingin++;
+            }
+            else
+            {
+                // Gérer une erreur d'allocation si nécessaire
+                fprintf(stderr, "Erreur d'allocation de mémoire pour nbingredient[%d]\n", ingin);
             }
         }
     }
+}
+
 
     if (ingin != N || qind != N) 
     {
